@@ -1,8 +1,18 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"Server/database"
+
+	"github.com/gin-gonic/gin"
+)
 
 func main() {
+
+	err := database.Connect()
+	if err != nil {
+		panic(err)
+	}
+
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {
