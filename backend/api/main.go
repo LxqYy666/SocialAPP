@@ -2,6 +2,7 @@ package main
 
 import (
 	"Server/database"
+	"Server/routes"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +21,8 @@ func main() {
 			"message": "pong",
 		})
 	})
+
+	routes.SetupRoutes(r)
 
 	r.Run() // listen and serve on
 }

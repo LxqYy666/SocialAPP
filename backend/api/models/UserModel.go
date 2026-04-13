@@ -12,3 +12,10 @@ type User struct {
 	Followers []string           `json:"followers" bson:"followers"`
 	Following []string           `json:"following" bson:"following"`
 }
+
+type CreateUser struct {
+	Email     string `json:"email" bson:"email" binding:"required,email"`
+	Password  string `json:"password" bson:"password" binding:"required,min=5"`
+	FirstName string `json:"firstName" bson:"firstName"`
+	LastName  string `json:"lastName" bson:"lastName"`
+}
