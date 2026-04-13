@@ -19,3 +19,8 @@ type CreateUser struct {
 	FirstName string `json:"firstName" bson:"firstName"`
 	LastName  string `json:"lastName" bson:"lastName"`
 }
+
+type SignInUser struct {
+	Email    string `json:"email" bson:"email" binding:"required,email"`
+	Password string `json:"password" bson:"password" binding:"required,min=5"`
+}

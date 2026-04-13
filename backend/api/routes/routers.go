@@ -9,5 +9,6 @@ import (
 func SetupRoutes(r *gin.Engine) {
 
 	r.POST("/user/signup", controller.SignUp)
+	r.POST("/user/signin", controller.SignIn)
 
 }
