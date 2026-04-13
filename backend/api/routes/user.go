@@ -12,4 +12,6 @@ func SetupUserRoutes(r *gin.Engine) {
 	r.GET("/user/getuser/:id", controller.GetUserById)
 
 	r.PATCH("/user/update/:id", middlewares.AuthMiddleWare, controller.UpdateUser)
+
+	r.PATCH("/user/:id/following", middlewares.AuthMiddleWare, controller.FollowUser)
 }
