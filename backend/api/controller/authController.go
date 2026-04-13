@@ -3,6 +3,7 @@ package controller
 import (
 	"Server/database"
 	"Server/models"
+	"Server/utils"
 	"context"
 	"net/http"
 	"time"
@@ -60,8 +61,21 @@ func SignUp(c *gin.Context) {
 		return
 	}
 
+	query := bson.M{"_id": result.InsertedID}
+	var createdUser models.User
+	userSchema.FindOne(ctx, query).Decode(&createdUser)
+
+	token, err := utils.GenerateJWT(createdUser.ID.Hex())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate token",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": result.InsertedID,
+		"result": createdUser,
+		"token":  token,
 	})
 
 }

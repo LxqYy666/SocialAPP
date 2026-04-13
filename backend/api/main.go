@@ -3,6 +3,7 @@ package main
 import (
 	"Server/database"
 	"Server/routes"
+	_ "Server/utils"
 
 	"github.com/gin-gonic/gin"
 )
