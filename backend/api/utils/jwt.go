@@ -20,7 +20,7 @@ func GenerateJWT(userID string) (string, error) {
 
 func ValidateJWT(tokenString string) (*jwt.RegisteredClaims, error) {
 	// Implement JWT validation logic here
-	token, err := jwt.ParseWithClaims(tokenString, jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(viper.GetString("JWT_SECRET")), nil
 	})
 	if err != nil {

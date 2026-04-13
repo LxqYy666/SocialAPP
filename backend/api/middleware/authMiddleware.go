@@ -1,7 +1,8 @@
-package middleware
+package middlewares
 
 import (
 	"Server/utils"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -16,12 +17,16 @@ func AuthMiddleWare(c *gin.Context) {
 		return
 	}
 
+	fmt.Println(tokenString)
+
 	if !strings.HasPrefix(tokenString, "Bearer ") {
 		tokenString = strings.TrimSpace(tokenString)
 	} else {
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 		tokenString = strings.TrimSpace(tokenString)
 	}
+
+	fmt.Println(tokenString)
 
 	claims, err := utils.ValidateJWT(tokenString)
 	if err != nil {

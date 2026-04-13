@@ -24,3 +24,9 @@ type SignInUser struct {
 	Email    string `json:"email" bson:"email" binding:"required,email"`
 	Password string `json:"password" bson:"password" binding:"required,min=5"`
 }
+
+type UpdateUser struct {
+	Name     string `json:"name" bson:"name"`
+	ImageUrl string `json:"imageUrl" bson:"imageUrl"`
+	Bio      string `json:"bio" bson:"bio"`
+}
