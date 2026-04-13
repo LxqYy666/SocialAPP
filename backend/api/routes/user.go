@@ -16,4 +16,6 @@ func SetupUserRoutes(r *gin.Engine) {
 	r.PATCH("/user/:id/following", middlewares.AuthMiddleWare, controller.FollowUser)
 
 	r.GET("/user/sug/user", middlewares.AuthMiddleWare, controller.SuggestedUsers)
+
+	r.DELETE("/user/delete/:id", middlewares.AuthMiddleWare, controller.DeleteUser)
 }

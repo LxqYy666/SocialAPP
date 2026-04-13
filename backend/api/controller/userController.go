@@ -232,3 +232,42 @@ func SuggestedUsers(c *gin.Context) {
 	})
 
 }
+
+func DeleteUser(c *gin.Context) {
+	var userSchema = database.DB.Collection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	paramUserId := c.Param("id")
+	if userId.(string) != paramUserId {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		return
+	}
+
+	objUserId, err := bson.ObjectIDFromHex(userId.(string))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	result, err := userSchema.DeleteOne(ctx, bson.M{"_id": objUserId})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to delete user"})
+		return
+	}
+
+	if result.DeletedCount == 0 {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "User deleted successfully",
+	})
+}
