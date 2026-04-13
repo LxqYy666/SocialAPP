@@ -170,3 +170,65 @@ func FollowUser(c *gin.Context) {
 		"firstUser":  firstUser,
 	})
 }
+
+func SuggestedUsers(c *gin.Context) {
+	var userSchema = database.DB.Collection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	objUserId, err := bson.ObjectIDFromHex(userId.(string))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var currentUser models.User
+	err = userSchema.FindOne(ctx, bson.M{"_id": objUserId}).Decode(&currentUser)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+
+	//获取关注列表中用户关注的人的ID
+	followingIds := make([]string, 0)
+	for _, followingId := range currentUser.Following {
+		var followingUser models.User
+		objFollowingId, err := bson.ObjectIDFromHex(followingId)
+		if err != nil {
+			continue
+		}
+		err = userSchema.FindOne(ctx, bson.M{"_id": objFollowingId}).Decode(&followingUser)
+		if err == nil {
+			for _, id := range followingUser.Following {
+				if id != currentUser.ID.Hex() && !slices.Contains(currentUser.Following, id) {
+					followingIds = append(followingIds, id)
+				}
+			}
+		}
+	}
+
+	//从数据库中获取这些用户的信息
+	suggestedUsers := make([]models.User, 0)
+	for _, id := range followingIds {
+		var user models.User
+		objId, err := bson.ObjectIDFromHex(id)
+		if err != nil {
+			continue
+		}
+		err = userSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+		if err == nil {
+			suggestedUsers = append(suggestedUsers, user)
+		}
+	}
+
+	c.JSON(200, gin.H{
+		"suggestedUsers": suggestedUsers,
+	})
+
+}
