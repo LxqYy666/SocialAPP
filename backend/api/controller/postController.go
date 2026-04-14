@@ -4,10 +4,12 @@ import (
 	"Server/database"
 	"Server/models"
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func CreatePost(c *gin.Context) {
@@ -133,6 +135,65 @@ func UpdatePost(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"message": "Post updated successfully",
+	})
+
+}
+
+func GetAllPosts(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	var userSchema = database.DB.Collection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	userId := c.Query("id")
+	page, err := strconv.Atoi(c.Query("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	var user models.User
+	objId, err := bson.ObjectIDFromHex(userId)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+	err = userSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+	user.Following = append(user.Following, userId)
+
+	filter := bson.M{"creator": bson.M{"$in": user.Following}}
+
+	totalPosts, err := postSchema.CountDocuments(ctx, filter)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to count posts"})
+		return
+	}
+
+	findOptions := options.Find()
+	findOptions.SetSort(bson.D{{Key: "createdAt", Value: -1}})
+	findOptions.SetSkip(int64((page - 1) * 2))
+	findOptions.SetLimit(2)
+
+	cursor, err := postSchema.Find(ctx, filter, findOptions)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch posts"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var posts []models.Post
+	if err := cursor.All(ctx, &posts); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode posts"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"posts":         posts,
+		"currentPage":   page,
+		"numberOfPages": (totalPosts + 1) / 2,
 	})
 
 }
