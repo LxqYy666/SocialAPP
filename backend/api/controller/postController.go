@@ -95,3 +95,44 @@ func GetPostById(c *gin.Context) {
 		"post": post,
 	})
 }
+
+func UpdatePost(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	objId, err := bson.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	var authPost models.Post
+	err = postSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&authPost)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	} else {
+		if authPost.Creator != c.GetString("userId") {
+			c.JSON(403, gin.H{"error": "Forbidden: You are not the creator of this post"})
+			return
+		}
+	}
+
+	var post models.CreateOrUpdatePost
+	if err := c.ShouldBindJSON(&post); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err = postSchema.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": post})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to update post"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "Post updated successfully",
+	})
+
+}

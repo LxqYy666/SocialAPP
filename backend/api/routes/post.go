@@ -10,4 +10,5 @@ import (
 func SetupPostRoutes(r *gin.Engine) {
 	r.POST("/post/create", middlewares.AuthMiddleWare, controller.CreatePost)
 	r.GET("/post/get/:id", controller.GetPostById)
+	r.PATCH("/post/:id", middlewares.AuthMiddleWare, controller.UpdatePost)
 }
