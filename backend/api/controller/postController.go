@@ -1,0 +1,97 @@
+package controller
+
+import (
+	"Server/database"
+	"Server/models"
+	"context"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/bson"
+)
+
+func CreatePost(c *gin.Context) {
+	var post models.CreateOrUpdatePost
+	if err := c.ShouldBindJSON(&post); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	var userSchema = database.DB.Collection("users")
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var user models.User
+	strID, exists := c.Get("userId")
+	if !exists {
+		c.JSON(400, gin.H{"error": "User ID not found"})
+		return
+	}
+	objID, err := bson.ObjectIDFromHex(strID.(string))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+	userResult := userSchema.FindOne(ctx, bson.M{"_id": objID})
+	if userResult.Err() != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+
+	if err := userResult.Decode(&user); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode user data"})
+		return
+	}
+
+	newPost := models.Post{
+		Creator:      strID.(string),
+		Title:        post.Title,
+		Message:      post.Message,
+		Name:         user.Name,
+		SelectedFile: post.SelectedFile,
+		Likes:        make([]string, 0),
+		Comments:     make([]string, 0),
+		CreatedAt:    time.Now(),
+	}
+
+	result, err := postSchema.InsertOne(ctx, newPost)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to create post"})
+		return
+	}
+	c.JSON(201, gin.H{
+		"message": "Post created successfully",
+		"postId":  result.InsertedID,
+	})
+
+}
+
+func GetPostById(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// fmt.Println("Post ID:", c.Param("id")) // Debugging line to check the post ID being received
+	objId, err := bson.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	postResult := postSchema.FindOne(ctx, bson.M{"_id": objId})
+	if postResult.Err() != nil {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	}
+
+	var post models.Post
+	if err := postResult.Decode(&post); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode post data"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"post": post,
+	})
+}
