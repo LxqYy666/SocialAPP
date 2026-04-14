@@ -197,3 +197,58 @@ func GetAllPosts(c *gin.Context) {
 	})
 
 }
+
+func GetPostsUsersBySearch(c *gin.Context) {
+	var userSchema = database.DB.Collection("users")
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	searchQuery := c.Query("searchQuery")
+	if searchQuery == "" {
+		c.JSON(400, gin.H{"error": "Search query is required"})
+		return
+	}
+
+	filterPosts := bson.M{"$or": []bson.M{
+		{"title": bson.M{"$regex": searchQuery, "$options": "i"}},
+		{"message": bson.M{"$regex": searchQuery, "$options": "i"}},
+	}}
+
+	filterUsers := bson.M{"$or": []bson.M{
+		{"name": bson.M{"$regex": searchQuery, "$options": "i"}},
+		{"email": bson.M{"$regex": searchQuery, "$options": "i"}},
+	}}
+
+	postCursor, err := postSchema.Find(ctx, filterPosts)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to search posts"})
+		return
+	}
+	defer postCursor.Close(ctx)
+
+	var posts []models.Post
+	if err := postCursor.All(ctx, &posts); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode posts"})
+		return
+	}
+
+	userCursor, err := userSchema.Find(ctx, filterUsers)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to search users"})
+		return
+	}
+	defer userCursor.Close(ctx)
+
+	var users []models.User
+	if err := userCursor.All(ctx, &users); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode users"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"posts": posts,
+		"users": users,
+	})
+
+}
