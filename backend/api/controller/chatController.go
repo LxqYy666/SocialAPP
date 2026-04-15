@@ -121,3 +121,35 @@ func GetUserUnReadedMsg(c *gin.Context) {
 
 	c.JSON(200, gin.H{"totalUnReadedMsg": totalUnReadedMsg, "unReadedMsgs": unReadedMsgs})
 }
+
+func MaskUnReadedMsg(c *gin.Context) {
+	var unReadedMsgSchema = database.DB.Collection("unReadedMsgs")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	userId := c.GetString("userId")
+	otherUserId := c.Query("otherUserId")
+	if userId == "" || otherUserId == "" {
+		c.JSON(400, gin.H{"error": "User ID and Other User ID are required"})
+		return
+	}
+
+	filter := bson.M{"mainUserId": userId, "otherUserId": otherUserId}
+	update := bson.M{"$set": bson.M{"numOfUnReadedMsg": 0, "isReaded": true}}
+	options := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
+
+	var updateDoc bson.M
+	err := unReadedMsgSchema.FindOneAndUpdate(ctx, filter, update, options).Decode(&updateDoc)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to mark messages as read"})
+		return
+	}
+
+	isMarked := updateDoc != nil
+
+	c.JSON(200, gin.H{
+		"message":  "Messages marked as read successfully",
+		"isMarked": isMarked,
+	})
+
+}
