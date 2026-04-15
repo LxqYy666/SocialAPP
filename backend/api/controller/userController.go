@@ -14,6 +14,7 @@ import (
 
 func GetUserById(c *gin.Context) {
 	var userSchema = database.DB.Collection("users")
+	var postSchema = database.DB.Collection("posts")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -35,9 +36,26 @@ func GetUserById(c *gin.Context) {
 		return
 	}
 
+	var posts []models.Post
+	cursor, err := postSchema.Find(ctx, bson.M{"creator": user.ID.Hex()})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch user's posts"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var post models.Post
+		if err := cursor.Decode(&post); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to decode post data"})
+			return
+		}
+		posts = append(posts, post)
+	}
+
 	c.JSON(200, gin.H{
 		"user":  user,
-		"posts": []string{}, // Placeholder for user posts, implement post retrieval logic as needed
+		"posts": posts,
 	})
 
 }
