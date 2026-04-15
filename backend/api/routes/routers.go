@@ -9,4 +9,5 @@ func SetupRoutes(r *gin.Engine) {
 	SetupUserRoutes(r)
 	SetupPostRoutes(r)
 	SetupChatRoutes(r)
+	SetupNotificationRoutes(r)
 }

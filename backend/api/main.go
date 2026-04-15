@@ -2,6 +2,7 @@ package main
 
 import (
 	"Server/database"
+	middlewares "Server/middleware"
 	"Server/routes"
 	_ "Server/utils"
 
@@ -16,6 +17,7 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(middlewares.CORSMiddleware())
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{

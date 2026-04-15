@@ -11,4 +11,5 @@ func SetupChatRoutes(r *gin.Engine) {
 	r.POST("/chat/sendMsg", middlewares.AuthMiddleWare, controller.SendMsg)
 	r.GET("/chat/getMsgByNums", middlewares.AuthMiddleWare, controller.GetMsgByNums)
 	r.GET("/chat/getUserUnReadedMsg", middlewares.AuthMiddleWare, controller.GetUserUnReadedMsg)
+	r.PATCH("/chat/maskUnReadedMsg", middlewares.AuthMiddleWare, controller.MaskUnReadedMsg)
 }
