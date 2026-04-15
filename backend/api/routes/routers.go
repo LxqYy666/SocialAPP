@@ -8,4 +8,5 @@ func SetupRoutes(r *gin.Engine) {
 	SetupAuthRoutes(r)
 	SetupUserRoutes(r)
 	SetupPostRoutes(r)
+	SetupChatRoutes(r)
 }

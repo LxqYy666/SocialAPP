@@ -8,3 +8,8 @@ type Message struct {
 	Receiver string        `json:"receiver" bson:"receiver"`
 	Content  string        `json:"content" bson:"content" binding:"required"`
 }
+
+type SendMsg struct {
+	Receiver string `json:"receiver" bson:"receiver" binding:"required"`
+	Content  string `json:"content" bson:"content" binding:"required"`
+}
