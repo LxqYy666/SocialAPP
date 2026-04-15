@@ -106,6 +106,7 @@ func UpdateUser(c *gin.Context) {
 
 func FollowUser(c *gin.Context) {
 	var userSchema = database.DB.Collection("users")
+	var notificationSchema = database.DB.Collection("notifications")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -152,6 +153,23 @@ func FollowUser(c *gin.Context) {
 	} else {
 		firstUser.Following = append(firstUser.Following, secondUser.ID.Hex())
 		secondUser.Followers = append(secondUser.Followers, firstUser.ID.Hex())
+
+		// Create a new notification for the followed user
+		newNotification := models.Notification{
+			MainUID:   secondUserId,
+			TargetUID: firstUserId.(string),
+			Details:   firstUser.Name + " started following you.",
+			NotificationUser: models.NotificationUser{
+				Name:    firstUser.Name,
+				Avartar: firstUser.ImageUrl,
+			},
+			CreatedAt: time.Now(),
+		}
+		_, err = notificationSchema.InsertOne(ctx, newNotification)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to create notification"})
+			return
+		}
 	}
 
 	_, err = userSchema.UpdateOne(ctx, bson.M{"_id": objFirstUserId}, bson.M{"$set": bson.M{"following": firstUser.Following}})

@@ -256,6 +256,7 @@ func GetPostsUsersBySearch(c *gin.Context) {
 
 func CommentPost(c *gin.Context) {
 	var postSchema = database.DB.Collection("posts")
+	var notificationSchema = database.DB.Collection("notifications")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -287,6 +288,35 @@ func CommentPost(c *gin.Context) {
 	}
 
 	//TODO: Notify post creator about new comment start
+	var user models.User
+	objId, err = bson.ObjectIDFromHex(c.GetString("userId"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid user ID"})
+		return
+	}
+	err = database.DB.Collection("users").FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+	if post.Creator != c.GetString("userId") {
+		newNotification := models.Notification{
+			MainUID:   post.Creator,
+			TargetUID: post.ID.Hex(),
+			Details:   user.Name + "comment you",
+			NotificationUser: models.NotificationUser{
+				Name:    user.Name,
+				Avartar: user.ImageUrl,
+			},
+			CreatedAt: time.Now(),
+		}
+		_, err = notificationSchema.InsertOne(ctx, newNotification)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to create notification"})
+			return
+		}
+
+	}
 	//end
 
 	c.JSON(200, gin.H{
@@ -296,6 +326,7 @@ func CommentPost(c *gin.Context) {
 
 func LikePost(c *gin.Context) {
 	var postSchema = database.DB.Collection("posts")
+	var notificationSchema = database.DB.Collection("notifications")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -317,6 +348,34 @@ func LikePost(c *gin.Context) {
 		post.Likes = slices.Delete(post.Likes, slices.Index(post.Likes, userId), slices.Index(post.Likes, userId)+1)
 	} else {
 		post.Likes = append(post.Likes, userId)
+		var user models.User
+		objId, err = bson.ObjectIDFromHex(c.GetString("userId"))
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid user ID"})
+			return
+		}
+		err = database.DB.Collection("users").FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+		if post.Creator != c.GetString("userId") && !slices.Contains(post.Likes, userId) {
+			newNotification := models.Notification{
+				MainUID:   post.Creator,
+				TargetUID: post.ID.Hex(),
+				Details:   user.Name + "like you post",
+				NotificationUser: models.NotificationUser{
+					Name:    user.Name,
+					Avartar: user.ImageUrl,
+				},
+				CreatedAt: time.Now(),
+			}
+			_, err = notificationSchema.InsertOne(ctx, newNotification)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Failed to create notification"})
+				return
+			}
+		}
 	}
 
 	_, err = postSchema.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{"likes": post.Likes}})
