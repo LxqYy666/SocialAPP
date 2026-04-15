@@ -252,3 +252,43 @@ func GetPostsUsersBySearch(c *gin.Context) {
 	})
 
 }
+
+func CommentPost(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var comment models.CommentPost
+	if err := c.ShouldBindJSON(&comment); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	var post models.Post
+	objId, err := bson.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	err = postSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&post)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	}
+
+	newComment := bson.M{"comments": append(post.Comments, comment.Value)}
+
+	_, err = postSchema.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": newComment})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to add comment"})
+		return
+	}
+
+	//TODO: Notify post creator about new comment start
+	//end
+
+	c.JSON(200, gin.H{
+		"message": "Comment added successfully",
+	})
+}

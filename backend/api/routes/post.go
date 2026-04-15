@@ -13,4 +13,5 @@ func SetupPostRoutes(r *gin.Engine) {
 	r.GET("/post/all", controller.GetAllPosts)
 	r.GET("/post/search", controller.GetPostsUsersBySearch)
 	r.PATCH("/post/:id", middlewares.AuthMiddleWare, controller.UpdatePost)
+	r.POST("/post/:id/commentPost", middlewares.AuthMiddleWare, controller.CommentPost)
 }

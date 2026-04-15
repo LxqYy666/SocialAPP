@@ -23,3 +23,7 @@ type CreateOrUpdatePost struct {
 	Message      string `json:"message" bson:"message" bingding:"required"`
 	SelectedFile string `json:"selectedFile" bson:"selectedFile"`
 }
+
+type CommentPost struct {
+	Value string `json:"value" bson:"value" binding:"required"`
+}
