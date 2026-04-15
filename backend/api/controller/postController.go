@@ -4,6 +4,7 @@ import (
 	"Server/database"
 	"Server/models"
 	"context"
+	"slices"
 	"strconv"
 	"time"
 
@@ -290,5 +291,41 @@ func CommentPost(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"message": "Comment added successfully",
+	})
+}
+
+func LikePost(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var post models.Post
+	objId, err := bson.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	err = postSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&post)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	}
+
+	userId := c.GetString("userId")
+	if slices.Contains(post.Likes, userId) {
+		post.Likes = slices.Delete(post.Likes, slices.Index(post.Likes, userId), slices.Index(post.Likes, userId)+1)
+	} else {
+		post.Likes = append(post.Likes, userId)
+	}
+
+	_, err = postSchema.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{"likes": post.Likes}})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to update likes"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "Post like status updated successfully",
 	})
 }
