@@ -329,3 +329,40 @@ func LikePost(c *gin.Context) {
 		"message": "Post like status updated successfully",
 	})
 }
+
+func DeletePost(c *gin.Context) {
+	var postSchema = database.DB.Collection("posts")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	objId, err := bson.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	var authPost models.Post
+	err = postSchema.FindOne(ctx, bson.M{"_id": objId}).Decode(&authPost)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	}
+	if authPost.Creator != c.GetString("userId") {
+		c.JSON(403, gin.H{"error": "Forbidden: You are not the creator of this post"})
+		return
+	}
+	result, err := postSchema.DeleteOne(ctx, bson.M{"_id": objId})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to delete post"})
+		return
+	}
+	if result.DeletedCount == 0 {
+		c.JSON(404, gin.H{"error": "Post not found"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "Post deleted successfully",
+	})
+
+}
