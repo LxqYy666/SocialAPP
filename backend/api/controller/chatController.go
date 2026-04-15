@@ -94,3 +94,30 @@ func GetMsgByNums(c *gin.Context) {
 
 	c.JSON(200, gin.H{"messages": messages})
 }
+
+func GetUserUnReadedMsg(c *gin.Context) {
+	var unReadedMsgSchema = database.DB.Collection("unReadedMsgs")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	userId := c.GetString("userId")
+	cursor, err := unReadedMsgSchema.Find(ctx, bson.M{"mainUserId": userId, "isReaded": false})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to retrieve unread messages"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var unReadedMsgs []models.UnReadedMsg
+	if err = cursor.All(ctx, &unReadedMsgs); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode unread messages"})
+		return
+	}
+
+	var totalUnReadedMsg int = 0
+	for _, unReadedMsg := range unReadedMsgs {
+		totalUnReadedMsg += unReadedMsg.NumOfUnReadedMsg
+	}
+
+	c.JSON(200, gin.H{"totalUnReadedMsg": totalUnReadedMsg, "unReadedMsgs": unReadedMsgs})
+}
