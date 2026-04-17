@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func GetNotificationByUserId(c *gin.Context) {
@@ -17,7 +18,9 @@ func GetNotificationByUserId(c *gin.Context) {
 
 	userId := c.GetString("userId")
 
-	cursor, err := notificationSchema.Find(ctx, bson.M{"mainUID": userId})
+	findOptions := options.Find()
+	findOptions.SetSort(bson.D{{Key: "createdAt", Value: -1}})
+	cursor, err := notificationSchema.Find(ctx, bson.M{"mainUserId": userId}, findOptions)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch notifications"})
 		return
@@ -49,8 +52,8 @@ func MarkNotificationRead(c *gin.Context) {
 
 	userId := c.GetString("userId")
 
-	filter := bson.M{"mainUID": userId, "isRead": false}
-	update := bson.M{"$set": bson.M{"isRead": true}}
+	filter := bson.M{"mainUserId": userId, "isReaded": false}
+	update := bson.M{"$set": bson.M{"isReaded": true}}
 
 	result, err := notificationSchema.UpdateMany(ctx, filter, update)
 	if err != nil {

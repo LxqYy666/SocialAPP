@@ -14,6 +14,8 @@
 					placeholder="搜索内容"
 					clearable
 					size="large"
+					@keyup.enter="submitSearch"
+					@clear="submitSearch"
 				>
 					<template #prefix>
 						<svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
@@ -22,44 +24,425 @@
 							/>
 						</svg>
 					</template>
+					<template #suffix>
+						<el-button class="search-action" circle text aria-label="执行搜索" @click="submitSearch">
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
+								<path
+									d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm5.97 8.56 3.97 3.97-1.41 1.41-3.97-3.97 1.41-1.41Z"
+								/>
+							</svg>
+						</el-button>
+					</template>
 				</el-input>
 			</el-col>
 
 			<el-col :xs="24" :sm="6" :md="7" class="nav-right">
 				<el-space :size="10" alignment="center">
-					<el-button class="icon-button" circle aria-label="消息">
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="action-icon">
-							<path
-								d="M4 4h16v12H7.17L4 19.17V4Zm2 2v8.34L6.34 14H18V6H6Zm2 2h8v2H8V8Zm0 4h6v2H8v-2Z"
-							/>
-						</svg>
+					<el-button type="primary" class="publish-button" @click="openPublishDialog">
+						发布帖子
 					</el-button>
 
-					<el-button class="icon-button" circle aria-label="通知">
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="action-icon">
-							<path
-								d="M12 3a5 5 0 0 0-5 5v2.28c0 .79-.25 1.56-.72 2.2L4 15v1h16v-1l-2.28-2.52c-.47-.64-.72-1.41-.72-2.2V8a5 5 0 0 0-5-5Zm0 18a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 21Z"
-							/>
-						</svg>
-					</el-button>
+					<el-badge :value="unreadMessageCount" :hidden="unreadMessageCount === 0" class="notification-badge">
+						<el-button class="icon-button" circle aria-label="消息" @click="openMessages">
+							<svg viewBox="0 0 24 24" aria-hidden="true" class="action-icon">
+								<path
+									d="M4 4h16v12H7.17L4 19.17V4Zm2 2v8.34L6.34 14H18V6H6Zm2 2h8v2H8V8Zm0 4h6v2H8v-2Z"
+								/>
+							</svg>
+						</el-button>
+					</el-badge>
 
-					<el-avatar class="avatar-button" :size="42" aria-label="个人头像">
-						<svg viewBox="0 0 24 24" aria-hidden="true" class="action-icon">
-							<path
-								d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4a3.25 3.25 0 1 1 0 6.5A3.25 3.25 0 0 1 12 7Zm0 14a7.97 7.97 0 0 1-5.75-2.45A5.75 5.75 0 0 1 12 15.75a5.75 5.75 0 0 1 5.75 2.8A7.97 7.97 0 0 1 12 21Z"
-							/>
-						</svg>
-					</el-avatar>
+					<el-popover
+						placement="bottom-end"
+						:width="380"
+						trigger="click"
+						:show-after="0"
+						:hide-after="80"
+						@show="loadNotifications"
+					>
+						<template #reference>
+							<el-badge :value="unreadCount" :hidden="unreadCount === 0" class="notification-badge">
+								<el-button class="icon-button" circle aria-label="通知">
+									<svg viewBox="0 0 24 24" aria-hidden="true" class="action-icon">
+										<path
+											d="M12 3a5 5 0 0 0-5 5v2.28c0 .79-.25 1.56-.72 2.2L4 15v1h16v-1l-2.28-2.52c-.47-.64-.72-1.41-.72-2.2V8a5 5 0 0 0-5-5Zm0 18a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 21Z"
+										/>
+									</svg>
+								</el-button>
+							</el-badge>
+						</template>
+
+						<div class="notification-popover">
+							<div class="notification-head">
+								<div>
+									<div class="notification-title">通知</div>
+									<div class="notification-subtitle">{{ unreadCount }} 条未读</div>
+								</div>
+								<el-button size="small" plain :disabled="!unreadCount" @click="markAllNotificationsRead">
+									全部已读
+								</el-button>
+							</div>
+
+							<div v-if="notificationLoading" class="notification-state">
+								<el-skeleton :rows="3" animated />
+							</div>
+
+							<div v-else-if="notifications.length" class="notification-list">
+								<div
+									v-for="notification in notifications"
+									:key="notification.id"
+									class="notification-item"
+									:class="{ unread: !notification.isReaded }"
+									tabindex="0"
+									role="button"
+									@click="openNotification(notification)"
+									@keydown.enter.prevent="openNotification(notification)"
+									@keydown.space.prevent="openNotification(notification)"
+								>
+									<el-avatar :size="40" :src="notification.notificationUser.avatar || ''">
+										{{ notificationUserText(notification) }}
+									</el-avatar>
+									<div class="notification-content">
+										<div class="notification-text">{{ notification.details }}</div>
+										<div class="notification-meta">
+											<span>{{ notification.notificationUser.name || '系统通知' }}</span>
+											<span>{{ formatNotificationDate(notification.createdAt) }}</span>
+										</div>
+									</div>
+									<el-tag size="small" :type="notification.isReaded ? 'info' : 'danger'" effect="plain">
+										{{ notification.isReaded ? '已读' : '未读' }}
+									</el-tag>
+								</div>
+							</div>
+
+							<el-empty v-else description="暂无通知" :image-size="84" />
+						</div>
+					</el-popover>
+
+					<el-popover
+						placement="bottom-end"
+						:width="280"
+						trigger="hover"
+						:show-after="120"
+						:hide-after="80"
+					>
+						<template #reference>
+							<el-avatar class="avatar-button" :size="42" :src="profileImage" aria-label="个人头像">
+								{{ avatarText }}
+							</el-avatar>
+						</template>
+
+						<div class="profile-popover">
+							<div class="profile-actions">
+								<el-button size="small" plain @click="goProfile">个人信息</el-button>
+								<el-button size="small" type="danger" @click="handleLogout">登出</el-button>
+							</div>
+						</div>
+					</el-popover>
 				</el-space>
 			</el-col>
 		</el-row>
+
+		<el-dialog v-model="publishDialogVisible" title="发布帖子" width="min(720px, 92vw)">
+			<el-form ref="postFormRef" :model="postForm" :rules="postRules" label-position="top" class="publish-form">
+				<el-form-item label="帖子标题" prop="title">
+					<el-input v-model="postForm.title" maxlength="80" show-word-limit placeholder="输入帖子标题" />
+				</el-form-item>
+
+				<el-form-item label="帖子内容" prop="message">
+					<el-input
+						v-model="postForm.message"
+						type="textarea"
+						:rows="6"
+						maxlength="1000"
+						show-word-limit
+						placeholder="分享一些动态、想法或故事"
+					/>
+				</el-form-item>
+
+				<el-form-item label="图片地址 / Base64 编码（可选）" prop="selectedFile">
+					<el-input
+						v-model="postForm.selectedFile"
+						type="textarea"
+						:rows="4"
+						maxlength="10000"
+						show-word-limit
+						placeholder="粘贴图片 URL 或 base64 字符串"
+					/>
+					<div class="helper-text">如果不需要图片，可以留空。</div>
+				</el-form-item>
+			</el-form>
+
+			<template #footer>
+				<div class="dialog-actions">
+					<el-button @click="closePublishDialog">取消</el-button>
+					<el-button :disabled="publishing" @click="resetPostForm">清空</el-button>
+					<el-button type="primary" :loading="publishing" @click="submitPost">发布帖子</el-button>
+				</div>
+			</template>
+		</el-dialog>
 	</header>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
+
+import { chatApi, notificationApi, postApi } from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const searchText = ref('')
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+const publishDialogVisible = ref(false)
+const publishing = ref(false)
+const postFormRef = ref()
+const notificationLoading = ref(false)
+const notifications = ref([])
+const unreadMessageCount = ref(0)
+
+const profileImage = computed(() => authStore.user?.imageUrl || '')
+const userId = computed(() => authStore.userId || '')
+const unreadCount = computed(() => notifications.value.filter((notification) => !notification.isReaded).length)
+
+const avatarText = computed(() => {
+	const name = (authStore.user?.name || '').trim()
+	return name ? name.slice(0, 1).toUpperCase() : 'U'
+})
+
+const postForm = reactive({
+	title: '',
+	message: '',
+	selectedFile: '',
+})
+
+const postRules = {
+	title: [{ required: true, message: '请输入帖子标题', trigger: 'blur' }],
+	message: [{ required: true, message: '请输入帖子内容', trigger: 'blur' }],
+}
+
+function submitSearch() {
+	const keyword = searchText.value.trim()
+	if (!keyword) {
+		ElMessage.warning('请输入搜索内容')
+		return
+	}
+
+	router.push({ name: 'search', query: { q: keyword } })
+}
+
+async function loadUnreadMessageCount() {
+	if (!userId.value) {
+		unreadMessageCount.value = 0
+		return
+	}
+
+	try {
+		const response = await chatApi.getUnreadMessages()
+		unreadMessageCount.value = Number(response?.totalUnReadedMsg || 0)
+	} catch {
+		unreadMessageCount.value = 0
+	}
+}
+
+function normalizeNotifications(rawNotifications = []) {
+	return rawNotifications.map((notification) => ({
+		id: notification?.id || notification?._id || '',
+		details: notification?.details || '',
+		targetUserId: notification?.targetUserId || '',
+		mainUserId: notification?.mainUserId || '',
+		type: notification?.type || inferNotificationType(notification?.details || ''),
+		isReaded: Boolean(notification?.isReaded),
+		createdAt: notification?.createdAt || '',
+		notificationUser: {
+			name: notification?.notificationUser?.name || '',
+			avatar: notification?.notificationUser?.avatar || '',
+		},
+	}))
+}
+
+function inferNotificationType(details) {
+	const text = String(details || '').toLowerCase()
+	if (text.includes('following you')) {
+		return 'follow'
+	}
+	if (text.includes('liked your post')) {
+		return 'like'
+	}
+	if (text.includes('commented on your post')) {
+		return 'comment'
+	}
+	return 'post'
+}
+
+function notificationUserText(notification) {
+	const name = String(notification?.notificationUser?.name || '').trim()
+	return name ? name.slice(0, 1).toUpperCase() : 'N'
+}
+
+function formatNotificationDate(createdAt) {
+	if (!createdAt) {
+		return '刚刚'
+	}
+
+	const date = new Date(createdAt)
+	if (Number.isNaN(date.getTime())) {
+		return '刚刚'
+	}
+
+	return new Intl.DateTimeFormat('zh-CN', {
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+	}).format(date)
+}
+
+async function loadNotifications() {
+	if (!userId.value) {
+		notifications.value = []
+		return
+	}
+
+	notificationLoading.value = true
+	try {
+		const response = await notificationApi.getAll()
+		notifications.value = normalizeNotifications(response?.notifications || [])
+	} catch {
+		notifications.value = []
+	} finally {
+		notificationLoading.value = false
+	}
+}
+
+async function markAllNotificationsRead() {
+	if (!unreadCount.value) {
+		return
+	}
+
+	try {
+		await notificationApi.markRead()
+		notifications.value = notifications.value.map((notification) => ({
+			...notification,
+			isReaded: true,
+		}))
+		ElMessage.success('已标记全部通知为已读')
+	} catch (error) {
+		ElMessage.error(error?.response?.data?.error || '标记已读失败')
+	}
+}
+
+async function openNotification(notification) {
+	if (!notification?.id) {
+		return
+	}
+
+	if (!notification.isReaded) {
+		try {
+			await notificationApi.markRead()
+			notifications.value = notifications.value.map((item) => ({
+				...item,
+				isReaded: true,
+			}))
+		} catch {
+			// keep navigation usable even if the read update fails
+		}
+	}
+
+	if (notification.type === 'follow') {
+		router.push({ name: 'user-profile', params: { id: notification.targetUserId } })
+		return
+	}
+
+	router.push({ name: 'post-detail', params: { id: notification.targetUserId } })
+}
+
+function openPublishDialog() {
+	publishDialogVisible.value = true
+}
+
+function closePublishDialog() {
+	publishDialogVisible.value = false
+}
+
+function resetPostForm() {
+	postForm.title = ''
+	postForm.message = ''
+	postForm.selectedFile = ''
+	postFormRef.value?.clearValidate()
+}
+
+async function submitPost() {
+	try {
+		await postFormRef.value?.validate()
+	} catch {
+		return
+	}
+
+	publishing.value = true
+	try {
+		await postApi.create({
+			title: postForm.title.trim(),
+			message: postForm.message.trim(),
+			selectedFile: postForm.selectedFile.trim(),
+		})
+		ElMessage.success('帖子发布成功')
+		resetPostForm()
+		closePublishDialog()
+	} catch (error) {
+		ElMessage.error(error?.response?.data?.error || '发布失败，请稍后重试')
+	} finally {
+		publishing.value = false
+	}
+}
+
+function goProfile() {
+	router.push({ name: 'profile' })
+}
+
+function handleLogout() {
+	authStore.logout()
+	router.replace({ name: 'auth', params: { mode: 'login' } })
+}
+
+function openMessages() {
+	router.push({ name: 'messages' })
+}
+
+watch(
+	() => route.query.q,
+	(query) => {
+		searchText.value = typeof query === 'string' ? query : ''
+	},
+	{ immediate: true },
+)
+
+onMounted(() => {
+	authStore.hydrate()
+	loadUnreadMessageCount()
+	window.addEventListener('chat-unread-changed', loadUnreadMessageCount)
+})
+
+onBeforeUnmount(() => {
+	window.removeEventListener('chat-unread-changed', loadUnreadMessageCount)
+})
+
+watch(
+	userId,
+	(nextUserId) => {
+		if (!nextUserId) {
+			notifications.value = []
+			unreadMessageCount.value = 0
+			return
+		}
+
+		loadNotifications()
+		loadUnreadMessageCount()
+	},
+	{ immediate: true },
+)
 </script>
 
 <style scoped>
@@ -153,11 +536,23 @@ const searchText = ref('')
 	transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
+.notification-badge {
+	display: inline-flex;
+}
+
+.publish-button {
+	height: 42px;
+	padding: 0 14px;
+	border-radius: 12px;
+	box-shadow: none;
+}
+
 .avatar-button {
 	width: 42px;
 	height: 42px;
 	padding: 0;
 	background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+	cursor: pointer;
 	border: 0;
 	color: #334155;
 	transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -174,6 +569,116 @@ const searchText = ref('')
 	height: 100%;
 	object-fit: cover;
 	border-radius: 50%;
+}
+
+.profile-popover {
+	padding: 4px;
+}
+
+.profile-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.publish-form {
+	padding-top: 4px;
+}
+
+.helper-text {
+	margin-top: 8px;
+	font-size: 12px;
+	color: #64748b;
+}
+
+.dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+}
+
+.notification-popover {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	max-height: 480px;
+}
+
+.notification-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.notification-title {
+	font-size: 16px;
+	font-weight: 800;
+	color: #0f172a;
+}
+
+.notification-subtitle {
+	margin-top: 4px;
+	font-size: 12px;
+	color: #64748b;
+}
+
+.notification-state {
+	padding: 12px 0;
+}
+
+.notification-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-height: 360px;
+	overflow: auto;
+}
+
+.notification-item {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 12px;
+	align-items: center;
+	padding: 12px;
+	border-radius: 14px;
+	background: #f8fafc;
+	border: 1px solid rgba(148, 163, 184, 0.12);
+	cursor: pointer;
+	transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.notification-item:hover {
+	background: #eef4ff;
+	transform: translateY(-1px);
+}
+
+.notification-item.unread {
+	background: rgba(59, 130, 246, 0.08);
+	border-color: rgba(59, 130, 246, 0.18);
+}
+
+.notification-content {
+	min-width: 0;
+}
+
+.notification-text {
+	font-size: 13px;
+	font-weight: 600;
+	color: #0f172a;
+	line-height: 1.5;
+	word-break: break-word;
+}
+
+.notification-meta {
+	margin-top: 5px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	font-size: 12px;
+	color: #64748b;
 }
 
 @media (max-width: 900px) {

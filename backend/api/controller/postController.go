@@ -303,7 +303,8 @@ func CommentPost(c *gin.Context) {
 		newNotification := models.Notification{
 			MainUID:   post.Creator,
 			TargetUID: post.ID.Hex(),
-			Details:   user.Name + "comment you",
+			Type:      "comment",
+			Details:   user.Name + " commented on your post.",
 			NotificationUser: models.NotificationUser{
 				Name:    user.Name,
 				Avartar: user.ImageUrl,
@@ -363,7 +364,8 @@ func LikePost(c *gin.Context) {
 			newNotification := models.Notification{
 				MainUID:   post.Creator,
 				TargetUID: post.ID.Hex(),
-				Details:   user.Name + "like you post",
+				Type:      "like",
+				Details:   user.Name + " liked your post.",
 				NotificationUser: models.NotificationUser{
 					Name:    user.Name,
 					Avartar: user.ImageUrl,

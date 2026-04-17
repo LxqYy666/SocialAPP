@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
@@ -37,12 +36,11 @@ func SendMsg(c *gin.Context) {
 		return
 	}
 
-	var unReadedMsg models.UnReadedMsg
 	filter := bson.M{"mainUserId": msg.Receiver, "otherUserId": senderId}
 	update := bson.M{"$inc": bson.M{"numOfUnReadedMsg": 1}, "$set": bson.M{"isReaded": false}}
-	opts := options.FindOneAndUpdate().SetUpsert(true)
-	err = unReadedMsgSchema.FindOneAndUpdate(ctx, filter, update, opts).Decode(&unReadedMsg)
-	if err != nil && err != mongo.ErrNoDocuments {
+	updateOptions := options.UpdateOne().SetUpsert(true)
+	_, err = unReadedMsgSchema.UpdateOne(ctx, filter, update, updateOptions)
+	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to update unread message count"})
 		return
 	}
@@ -136,20 +134,16 @@ func MaskUnReadedMsg(c *gin.Context) {
 
 	filter := bson.M{"mainUserId": userId, "otherUserId": otherUserId}
 	update := bson.M{"$set": bson.M{"numOfUnReadedMsg": 0, "isReaded": true}}
-	options := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
-
-	var updateDoc bson.M
-	err := unReadedMsgSchema.FindOneAndUpdate(ctx, filter, update, options).Decode(&updateDoc)
+	updateOptions := options.UpdateOne().SetUpsert(true)
+	result, err := unReadedMsgSchema.UpdateOne(ctx, filter, update, updateOptions)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to mark messages as read"})
 		return
 	}
 
-	isMarked := updateDoc != nil
-
 	c.JSON(200, gin.H{
 		"message":  "Messages marked as read successfully",
-		"isMarked": isMarked,
+		"isMarked": result.MatchedCount > 0 || result.UpsertedCount > 0,
 	})
 
 }

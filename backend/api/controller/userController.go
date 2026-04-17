@@ -176,6 +176,7 @@ func FollowUser(c *gin.Context) {
 		newNotification := models.Notification{
 			MainUID:   secondUserId,
 			TargetUID: firstUserId.(string),
+			Type:      "follow",
 			Details:   firstUser.Name + " started following you.",
 			NotificationUser: models.NotificationUser{
 				Name:    firstUser.Name,
