@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"log"
+	"realTimeChat/servergrpc"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -15,16 +16,14 @@ type Message struct {
 
 type ConnectionManager struct {
 	connections    map[string]*websocket.Conn
-	onlineFriends  map[string][]string
-	getUserFriends func(string) <-chan []string
-	lock           sync.Mutex
+	getUserFriends func(string) ([]string, error)
+	lock           sync.RWMutex
 }
 
-func NewConnectionManager(getUserFriends func(string) <-chan []string) *ConnectionManager {
+func NewConnectionManager(getUserFriends func(string) ([]string, error)) *ConnectionManager {
 	if getUserFriends != nil {
 		return &ConnectionManager{
 			connections:    make(map[string]*websocket.Conn),
-			onlineFriends:  make(map[string][]string),
 			getUserFriends: getUserFriends,
 		}
 	}
@@ -34,46 +33,17 @@ func NewConnectionManager(getUserFriends func(string) <-chan []string) *Connecti
 
 func (cm *ConnectionManager) AddConnection(userId string, conn *websocket.Conn) {
 	cm.lock.Lock()
-	defer cm.lock.Unlock()
 
 	cm.connections[userId] = conn
-	cm.onlineFriends[userId] = []string{}
+	cm.lock.Unlock()
 
-	//notify online friends
-	for friendId := range cm.onlineFriends {
-		if friendId != userId && cm.IsFriend(userId, friendId) {
-			cm.onlineFriends[friendId] = append(cm.onlineFriends[friendId], userId)
-			err := cm.connections[friendId].WriteJSON(map[string]any{
-				"onlineFriends": cm.onlineFriends[friendId],
-			})
-			if err != nil {
-				log.Printf("Error notify %s about %s : %v", friendId, userId, err.Error())
-				return
-			}
-		}
+	onlineFriends := cm.GetOnlineFriends(userId)
+	err := conn.WriteJSON(map[string]any{
+		"onlineFriends": onlineFriends,
+	})
+	if err != nil {
+		log.Printf("Error send online friends to %s: %v", userId, err)
 	}
-
-	//update new user online friends
-
-	go func() {
-		for friends := range cm.getUserFriends(userId) {
-			if friends == nil {
-				continue
-			}
-			for _, friendId := range friends {
-				if cm.connections[friendId] != nil {
-					cm.onlineFriends[userId] = append(cm.onlineFriends[userId], friendId)
-					err := cm.connections[userId].WriteJSON(map[string]any{
-						"onlineFriends": cm.onlineFriends[friendId],
-					})
-					if err != nil {
-						log.Printf("Error notify %s about %s : %v", userId, friendId, err.Error())
-						return
-					}
-				}
-			}
-		}
-	}()
 
 }
 
@@ -81,49 +51,41 @@ func (cm *ConnectionManager) RemoveConnection(userId string) {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
 	delete(cm.connections, userId)
-	delete(cm.onlineFriends, userId)
-
-	for friendId := range cm.onlineFriends {
-		for i, id := range cm.onlineFriends[friendId] {
-			if id == userId {
-				cm.onlineFriends[friendId] = append(cm.onlineFriends[friendId][:i], cm.onlineFriends[friendId][i+1:]...)
-				err := cm.connections[friendId].WriteJSON(map[string]any{
-					"onlineFriends": cm.onlineFriends[friendId],
-				})
-				if err != nil {
-					log.Printf("Error notify %s about %s : %v", friendId, userId, err.Error())
-					return
-				}
-				break
-			}
-		}
-	}
 }
 
 func (cm *ConnectionManager) SendToReceiver(msg Message) {
-	cm.lock.Lock()
-	defer cm.lock.Unlock()
+	err := servergrpc.SendMessageClient(msg.Sender, msg.Receiver, msg.Content)
+	if err != nil {
+		log.Printf("Error save message via grpc from %s to %s: %v", msg.Sender, msg.Receiver, err)
+		return
+	}
 
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
 	if conn, ok := cm.connections[msg.Receiver]; ok {
-		err := conn.WriteJSON(msg)
+		err = conn.WriteJSON(msg)
 		if err != nil {
 			log.Printf("Error Sending message to %s : %v", msg.Receiver, err.Error())
 		}
-		//TODO: SAVE TO DB BY GRPC
-	} else {
-		log.Printf("Receiver %s not found", msg.Receiver)
 	}
 }
 
-func (cm *ConnectionManager) IsFriend(userId, friendId string) bool {
-	friends := <-cm.getUserFriends(userId)
-	if friends == nil {
-		return false
+func (cm *ConnectionManager) GetOnlineFriends(userId string) []string {
+	friends, err := cm.getUserFriends(userId)
+	if err != nil {
+		log.Printf("Error get friends for %s: %v", userId, err)
+		return []string{}
 	}
-	for _, v := range friends {
-		if v == friendId {
-			return true
+
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
+
+	onlineFriends := make([]string, 0, len(friends))
+	for _, friendId := range friends {
+		if cm.connections[friendId] != nil {
+			onlineFriends = append(onlineFriends, friendId)
 		}
 	}
-	return false
+
+	return onlineFriends
 }

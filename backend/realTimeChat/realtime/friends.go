@@ -1,23 +1,17 @@
 package realtime
 
-func GetFriends(userId string) <-chan []string {
-	ch := make(chan []string)
-	go func() {
-		defer close(ch)
-		switch userId {
-		case "1":
-			ch <- []string{"2", "3", "4"}
-		case "2":
-			ch <- []string{"1", "3", "4"}
-		case "3":
-			ch <- []string{"1", "2", "4"}
-		case "4":
-			ch <- []string{"1"}
-		default:
-			ch <- []string{}
-		}
+import "realTimeChat/servergrpc"
 
-	}()
+func GetFriends(userId string) ([]string, error) {
+	userFriends, err := servergrpc.GetFollowingFollowersClient(userId)
+	if err != nil {
+		return nil, err
+	}
 
-	return ch
+	var friends []string
+	for _, userIDsList := range userFriends {
+		friends = append(friends, userIDsList.UserIdsList...)
+	}
+
+	return friends, nil
 }
