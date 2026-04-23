@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"realTimeNotification/realtime"
 	pb "realTimeNotification/servegrpc"
 	"sync"
 
@@ -15,6 +16,6 @@ func main() {
 	if err := pb.StartGrpcServer(wsmutex, wsConnections); err != nil {
 		log.Fatalf("failed to start gRPC server: %v", err)
 	}
-
+	go realtime.StartWebSocketServer(wsmutex, wsConnections)
 	select {}
 }
