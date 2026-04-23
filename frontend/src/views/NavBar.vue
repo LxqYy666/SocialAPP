@@ -189,23 +189,25 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 
-import { chatApi, notificationApi, postApi } from '../api'
+import { chatApi, postApi } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useNotificationRealtimeStore } from '../stores/notificationRealtime'
 
 const searchText = ref('')
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const notificationStore = useNotificationRealtimeStore()
 const publishDialogVisible = ref(false)
 const publishing = ref(false)
 const postFormRef = ref()
-const notificationLoading = ref(false)
-const notifications = ref([])
 const unreadMessageCount = ref(0)
 
 const profileImage = computed(() => authStore.user?.imageUrl || '')
 const userId = computed(() => authStore.userId || '')
-const unreadCount = computed(() => notifications.value.filter((notification) => !notification.isReaded).length)
+const notificationLoading = computed(() => notificationStore.loading)
+const notifications = computed(() => notificationStore.notifications)
+const unreadCount = computed(() => notificationStore.unreadCount)
 
 const avatarText = computed(() => {
 	const name = (authStore.user?.name || '').trim()
@@ -247,36 +249,6 @@ async function loadUnreadMessageCount() {
 	}
 }
 
-function normalizeNotifications(rawNotifications = []) {
-	return rawNotifications.map((notification) => ({
-		id: notification?.id || notification?._id || '',
-		details: notification?.details || '',
-		targetUserId: notification?.targetUserId || '',
-		mainUserId: notification?.mainUserId || '',
-		type: notification?.type || inferNotificationType(notification?.details || ''),
-		isReaded: Boolean(notification?.isReaded),
-		createdAt: notification?.createdAt || '',
-		notificationUser: {
-			name: notification?.notificationUser?.name || '',
-			avatar: notification?.notificationUser?.avatar || '',
-		},
-	}))
-}
-
-function inferNotificationType(details) {
-	const text = String(details || '').toLowerCase()
-	if (text.includes('following you')) {
-		return 'follow'
-	}
-	if (text.includes('liked your post')) {
-		return 'like'
-	}
-	if (text.includes('commented on your post')) {
-		return 'comment'
-	}
-	return 'post'
-}
-
 function notificationUserText(notification) {
 	const name = String(notification?.notificationUser?.name || '').trim()
 	return name ? name.slice(0, 1).toUpperCase() : 'N'
@@ -301,19 +273,10 @@ function formatNotificationDate(createdAt) {
 }
 
 async function loadNotifications() {
-	if (!userId.value) {
-		notifications.value = []
-		return
-	}
-
-	notificationLoading.value = true
 	try {
-		const response = await notificationApi.getAll()
-		notifications.value = normalizeNotifications(response?.notifications || [])
+		await notificationStore.fetchNotifications()
 	} catch {
-		notifications.value = []
-	} finally {
-		notificationLoading.value = false
+		notificationStore.clear()
 	}
 }
 
@@ -323,11 +286,7 @@ async function markAllNotificationsRead() {
 	}
 
 	try {
-		await notificationApi.markRead()
-		notifications.value = notifications.value.map((notification) => ({
-			...notification,
-			isReaded: true,
-		}))
+		await notificationStore.markAllRead()
 		ElMessage.success('已标记全部通知为已读')
 	} catch (error) {
 		ElMessage.error(error?.response?.data?.error || '标记已读失败')
@@ -341,11 +300,7 @@ async function openNotification(notification) {
 
 	if (!notification.isReaded) {
 		try {
-			await notificationApi.markRead()
-			notifications.value = notifications.value.map((item) => ({
-				...item,
-				isReaded: true,
-			}))
+			await notificationStore.markAllRead()
 		} catch {
 			// keep navigation usable even if the read update fails
 		}
@@ -403,6 +358,8 @@ function goProfile() {
 }
 
 function handleLogout() {
+	notificationStore.disconnect()
+	notificationStore.clear()
 	authStore.logout()
 	router.replace({ name: 'auth', params: { mode: 'login' } })
 }
@@ -422,10 +379,14 @@ watch(
 onMounted(() => {
 	authStore.hydrate()
 	loadUnreadMessageCount()
+	if (userId.value) {
+		notificationStore.connect(userId.value)
+	}
 	window.addEventListener('chat-unread-changed', loadUnreadMessageCount)
 })
 
 onBeforeUnmount(() => {
+	notificationStore.disconnect()
 	window.removeEventListener('chat-unread-changed', loadUnreadMessageCount)
 })
 
@@ -433,11 +394,13 @@ watch(
 	userId,
 	(nextUserId) => {
 		if (!nextUserId) {
-			notifications.value = []
+			notificationStore.disconnect()
+			notificationStore.clear()
 			unreadMessageCount.value = 0
 			return
 		}
 
+		notificationStore.connect(nextUserId)
 		loadNotifications()
 		loadUnreadMessageCount()
 	},

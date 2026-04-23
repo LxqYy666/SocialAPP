@@ -39,6 +39,7 @@
 							<div class="contact-meta">
 								<div class="contact-name">{{ contact.name || '未命名用户' }}</div>
 								<div class="contact-tags">
+									<el-tag v-if="isContactOnline(contact.id)" size="small" type="success">在线</el-tag>
 									<el-tag v-if="contact.relation === 'mutual'" size="small" type="success">互相关注</el-tag>
 									<el-tag v-else-if="contact.relation === 'following'" size="small" type="info">已关注</el-tag>
 									<el-tag v-else size="small" type="warning">粉丝</el-tag>
@@ -57,7 +58,10 @@
 								<el-avatar :size="46" :src="activeContact.imageUrl || ''">{{ authorText(activeContact.name) }}</el-avatar>
 								<div>
 									<div class="conversation-name">{{ activeContact.name }}</div>
-									<div class="conversation-subtitle">{{ activeContact.email || '暂无邮箱' }}</div>
+									<div class="conversation-subtitle">
+										{{ activeContact.email || '暂无邮箱' }}
+										<span v-if="isContactOnline(activeContact.id)"> · 在线</span>
+									</div>
 								</div>
 							</div>
 							<div class="conversation-actions">
@@ -113,16 +117,18 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 
 import { chatApi, userApi } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useChatRealtimeStore } from '../stores/chatRealtime'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const chatRealtimeStore = useChatRealtimeStore()
 
 const contactsLoading = ref(false)
 const messageLoading = ref(false)
@@ -138,6 +144,7 @@ const messageListRef = ref(null)
 
 const currentUserId = computed(() => authStore.userId || '')
 const activeContact = computed(() => contacts.value.find((contact) => contact.id === activeContactId.value) || null)
+const onlineFriendSet = computed(() => new Set(chatRealtimeStore.onlineFriendIds))
 
 function authorText(name) {
 	const value = String(name || '').trim()
@@ -172,6 +179,10 @@ function normalizeMessages(rawMessages = []) {
 		receiver: message?.receiver || '',
 		content: message?.content || '',
 	}))
+}
+
+function isContactOnline(contactId) {
+	return onlineFriendSet.value.has(String(contactId || ''))
 }
 
 async function fetchContacts() {
@@ -318,12 +329,25 @@ async function sendMessage() {
 
 	sending.value = true
 	try {
-		await chatApi.sendMessage({
-			receiver: activeContactId.value,
-			content,
-		})
+		const sentByWs = chatRealtimeStore.sendMessage(activeContactId.value, content)
+		if (!sentByWs) {
+			await chatApi.sendMessage({
+				receiver: activeContactId.value,
+				content,
+			})
+		}
+		messages.value = [
+			...messages.value,
+			{
+				id: `local-${Date.now()}`,
+				sender: currentUserId.value,
+				receiver: activeContactId.value,
+				content,
+			},
+		]
 		messageText.value = ''
-		await loadMessages(0, true)
+		await nextTick()
+		scrollToBottom()
 		await refreshUnreadCounts()
 		window.dispatchEvent(new Event('chat-unread-changed'))
 	} catch (error) {
@@ -347,6 +371,9 @@ function goHome() {
 
 onMounted(async () => {
 	authStore.hydrate()
+	if (currentUserId.value) {
+		chatRealtimeStore.connect(currentUserId.value)
+	}
 	await fetchContacts()
 	await refreshUnreadCounts()
 	const targetId = String(route.query.target || '')
@@ -355,6 +382,10 @@ onMounted(async () => {
 		await loadMessages(0, true)
 		await markCurrentChatRead()
 	}
+})
+
+onBeforeUnmount(() => {
+	chatRealtimeStore.disconnect()
 })
 
 watch(
@@ -376,6 +407,37 @@ watch(
 watch(activeContactId, async () => {
 	await refreshUnreadCounts()
 })
+
+watch(
+	() => currentUserId.value,
+	(nextUserId) => {
+		if (!nextUserId) {
+			chatRealtimeStore.disconnect()
+			return
+		}
+		chatRealtimeStore.connect(nextUserId)
+	},
+	{ immediate: true },
+)
+
+watch(
+	() => chatRealtimeStore.incomingMessages.length,
+	async () => {
+		let incoming = chatRealtimeStore.consumeIncomingMessage()
+		while (incoming) {
+			if (incoming.sender === activeContactId.value) {
+				messages.value = [...messages.value, incoming]
+				await nextTick()
+				scrollToBottom()
+				await markCurrentChatRead()
+			}
+			incoming = chatRealtimeStore.consumeIncomingMessage()
+		}
+
+		await refreshUnreadCounts()
+		window.dispatchEvent(new Event('chat-unread-changed'))
+	},
+)
 </script>
 
 <style scoped>

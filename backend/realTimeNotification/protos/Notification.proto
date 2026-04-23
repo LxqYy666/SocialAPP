@@ -15,10 +15,11 @@ message NotificationGrpcRequest {
   string mainuid = 3;
 
   string targetid = 4;
-  bool isreaded = 5;
-  google.protobuf.Timestamp createdAt = 6;
+  string type = 5;
+  bool isreaded = 6;
+  google.protobuf.Timestamp createdAt = 7;
 
-  Usergrpc user = 7;
+  Usergrpc user = 8;
 }
 
 message Usergrpc {

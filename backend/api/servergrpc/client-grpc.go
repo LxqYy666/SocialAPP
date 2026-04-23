@@ -49,6 +49,7 @@ func SendNotification(notification models.Notification) error {
 		Details:  notification.Details,
 		Mainuid:  notification.MainUID,
 		Targetid: notification.TargetUID,
+		Type:     notification.Type,
 		Isreaded: notification.IsReaded,
 		CreatedAt: &timestamp.Timestamp{
 			Seconds: notification.CreatedAt.Unix(),

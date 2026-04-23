@@ -3,6 +3,7 @@ package controller
 import (
 	"Server/database"
 	"Server/models"
+	"Server/servergrpc"
 	"context"
 	"net/http"
 	"slices"
@@ -184,11 +185,15 @@ func FollowUser(c *gin.Context) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_, err = notificationSchema.InsertOne(ctx, newNotification)
+		res, err := notificationSchema.InsertOne(ctx, newNotification)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Failed to create notification"})
 			return
 		}
+
+		newNotification.ID = res.InsertedID.(bson.ObjectID)
+		servergrpc.SendNotification(newNotification)
+
 	}
 
 	_, err = userSchema.UpdateOne(ctx, bson.M{"_id": objFirstUserId}, bson.M{"$set": bson.M{"following": firstUser.Following}})

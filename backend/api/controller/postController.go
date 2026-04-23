@@ -3,6 +3,7 @@ package controller
 import (
 	"Server/database"
 	"Server/models"
+	"Server/servergrpc"
 	"context"
 	"slices"
 	"strconv"
@@ -311,11 +312,14 @@ func CommentPost(c *gin.Context) {
 			},
 			CreatedAt: time.Now(),
 		}
-		_, err = notificationSchema.InsertOne(ctx, newNotification)
+		res, err := notificationSchema.InsertOne(ctx, newNotification)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "Failed to create notification"})
 			return
 		}
+
+		newNotification.ID = res.InsertedID.(bson.ObjectID)
+		servergrpc.SendNotification(newNotification)
 
 	}
 	//end
@@ -372,11 +376,14 @@ func LikePost(c *gin.Context) {
 				},
 				CreatedAt: time.Now(),
 			}
-			_, err = notificationSchema.InsertOne(ctx, newNotification)
+			res, err := notificationSchema.InsertOne(ctx, newNotification)
 			if err != nil {
 				c.JSON(500, gin.H{"error": "Failed to create notification"})
 				return
 			}
+
+			newNotification.ID = res.InsertedID.(bson.ObjectID)
+			servergrpc.SendNotification(newNotification)
 		}
 	}
 

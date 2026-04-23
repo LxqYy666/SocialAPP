@@ -14,6 +14,7 @@ type Notification struct {
 	Details   string    `json:"details"`
 	MainUID   string    `json:"mainuid"`
 	TargetID  string    `json:"targetid"`
+	Type      string    `json:"type"`
 	IsReaded  bool      `json:"isreaded"`
 	CreatedAt time.Time `json:"createdAt"`
 	User      User      `json:"user"`

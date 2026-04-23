@@ -29,9 +29,10 @@ type NotificationGrpcRequest struct {
 	Details       string                 `protobuf:"bytes,2,opt,name=details,proto3" json:"details,omitempty"`
 	Mainuid       string                 `protobuf:"bytes,3,opt,name=mainuid,proto3" json:"mainuid,omitempty"`
 	Targetid      string                 `protobuf:"bytes,4,opt,name=targetid,proto3" json:"targetid,omitempty"`
-	Isreaded      bool                   `protobuf:"varint,5,opt,name=isreaded,proto3" json:"isreaded,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
-	User          *Usergrpc              `protobuf:"bytes,7,opt,name=user,proto3" json:"user,omitempty"`
+	Type          string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	Isreaded      bool                   `protobuf:"varint,6,opt,name=isreaded,proto3" json:"isreaded,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=createdAt,proto3" json:"createdAt,omitempty"`
+	User          *Usergrpc              `protobuf:"bytes,8,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,6 +91,13 @@ func (x *NotificationGrpcRequest) GetMainuid() string {
 func (x *NotificationGrpcRequest) GetTargetid() string {
 	if x != nil {
 		return x.Targetid
+	}
+	return ""
+}
+
+func (x *NotificationGrpcRequest) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -171,15 +179,16 @@ var File_protos_Notification_proto protoreflect.FileDescriptor
 
 const file_protos_Notification_proto_rawDesc = "" +
 	"\n" +
-	"\x19protos/Notification.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xef\x01\n" +
+	"\x19protos/Notification.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\x02\n" +
 	"\x17NotificationGrpcRequest\x12\x0f\n" +
 	"\x03_id\x18\x01 \x01(\tR\x02Id\x12\x18\n" +
 	"\adetails\x18\x02 \x01(\tR\adetails\x12\x18\n" +
 	"\amainuid\x18\x03 \x01(\tR\amainuid\x12\x1a\n" +
-	"\btargetid\x18\x04 \x01(\tR\btargetid\x12\x1a\n" +
-	"\bisreaded\x18\x05 \x01(\bR\bisreaded\x128\n" +
-	"\tcreatedAt\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
-	"\x04user\x18\a \x01(\v2\t.UsergrpcR\x04user\"6\n" +
+	"\btargetid\x18\x04 \x01(\tR\btargetid\x12\x12\n" +
+	"\x04type\x18\x05 \x01(\tR\x04type\x12\x1a\n" +
+	"\bisreaded\x18\x06 \x01(\bR\bisreaded\x128\n" +
+	"\tcreatedAt\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
+	"\x04user\x18\b \x01(\v2\t.UsergrpcR\x04user\"6\n" +
 	"\bUsergrpc\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06avatar\x18\x02 \x01(\tR\x06avatar2e\n" +
